@@ -1,0 +1,12 @@
+{
+  "Soft Summer": ["#8aa3b5", "#9fb3c8", "#a7b7c7", "#b6c7cf", "#8f9aa6", "#b9a5b6", "#adb7a3", "#c7c1b3"],
+  "Cool Summer": ["#7aa0c4", "#6f93b0", "#a3b9d2", "#89a6be", "#9b93c7", "#8fb1aa", "#b3b7c7", "#a1a7b3"],
+  "Light Summer": ["#b7d7ea", "#cfe5f2", "#dbeaf4", "#c3d8e8", "#d8d2ee", "#cfe9e3", "#ece6f2", "#e6eef5"],
+  "Bright Winter": ["#00a3e0", "#0057b8", "#00c389", "#ff1f5b", "#7c3aed", "#0006cc", "#00b3e6", "#ff3385"],
+  "Deep Winter": ["#1b365d", "#2c2a4a", "#0b5563", "#3f2a56", "#123b5d", "#1b2a49", "#2e3a59", "#154360"],
+  "Soft Autumn": ["#9a8f7a", "#a5a58d", "#b69b7d", "#8f8b66", "#b69c8c", "#9d7e6f", "#a18f7f", "#8a7f6b"],
+  "Warm Autumn": ["#b5651d", "#c68642", "#a47149", "#8b5e3c", "#b08968", "#c08457", "#a77855", "#7f5f3d"],
+  "Light Spring": ["#f3d8d8", "#f7e1c6", "#e3f2f1", "#e6f7d9", "#f1e6ff", "#fbe8e7", "#f0f7ff", "#fff0e6"],
+  "Bright Spring": ["#ff6f61", "#00b8a9", "#ffd166", "#ef476f", "#06d6a0", "#118ab2", "#ffc43d", "#8338ec"]
+}
+

@@ -1,0 +1,4 @@
+product_name,product_url,image_path
+Example Dress A,https://example.com/a,/path/to/local/image_a.jpg
+Example Blouse B,https://example.com/b,/path/to/local/image_b.jpg
+
