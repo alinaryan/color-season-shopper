@@ -22,11 +22,12 @@ Built with **Python + Streamlit**, using color science in Lab space (ΔE76).
 ## 🚀 Quickstart
 
 ### Clone & Install
+**Python:** 3.11 recommended (custom Streamlit component compatibility). 
 ```bash
 git clone https://github.com/alinaryan/color-season-shopper.git
 cd color-season-shopper
-python -m venv .venv
-source .venv/bin/activate   # or .venv\Scripts\activate on Windows
+python3.11 -m venv venv
+source venv/bin/activate   # or venv\Scripts\activate on Windows
 pip install -r requirements.txt
 ```
 
