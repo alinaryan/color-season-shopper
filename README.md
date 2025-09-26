@@ -23,7 +23,7 @@ Built with **Python + Streamlit**, using color science in Lab space (ΔE76).
 
 ### Clone & Install
 ```bash
-git clone https://github.com/<your-username>/color-season-shopper.git
+git clone https://github.com/alinaryan/color-season-shopper.git
 cd color-season-shopper
 python -m venv .venv
 source .venv/bin/activate   # or .venv\Scripts\activate on Windows
