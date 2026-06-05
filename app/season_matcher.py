@@ -84,17 +84,21 @@ def deltaE76(lab1: Tuple[float, float, float], lab2: Tuple[float, float, float])
 # ---------- Palettes ----------
 
 DEFAULT_PALETTES = {
-    # Each season is represented by a handful of sample hex swatches.
-    # These are rough placeholders; real palettes can be swapped in via JSON.
-    "Soft Summer": ["#8aa3b5", "#9fb3c8", "#a7b7c7", "#b6c7cf", "#8f9aa6", "#b9a5b6", "#adb7a3", "#c7c1b3"],
-    "Cool Summer": ["#7aa0c4", "#6f93b0", "#a3b9d2", "#89a6be", "#9b93c7", "#8fb1aa", "#b3b7c7", "#a1a7b3"],
-    "Light Summer": ["#b7d7ea", "#cfe5f2", "#dbeaf4", "#c3d8e8", "#d8d2ee", "#cfe9e3", "#ece6f2", "#e6eef5"],
-    "Bright Winter": ["#00a3e0", "#0057b8", "#00c389", "#ff1f5b", "#7c3aed", "#0006cc", "#00b3e6", "#ff3385"],
-    "Deep Winter": ["#1b365d", "#2c2a4a", "#0b5563", "#3f2a56", "#123b5d", "#1b2a49", "#2e3a59", "#154360"],
-    "Soft Autumn": ["#9a8f7a", "#a5a58d", "#b69b7d", "#8f8b66", "#b69c8c", "#9d7e6f", "#a18f7f", "#8a7f6b"],
-    "Warm Autumn": ["#b5651d", "#c68642", "#a47149", "#8b5e3c", "#b08968", "#c08457", "#a77855", "#7f5f3d"],
-    "Light Spring": ["#f3d8d8", "#f7e1c6", "#e3f2f1", "#e6f7d9", "#f1e6ff", "#fbe8e7", "#f0f7ff", "#fff0e6"],
-    "Bright Spring": ["#ff6f61", "#00b8a9", "#ffd166", "#ef476f", "#06d6a0", "#118ab2", "#ffc43d", "#8338ec"],
+    "Light Spring":  ["#FAEBD7", "#FFD966", "#ECA299", "#E3A274", "#B5E7D0", "#A8D8EA", "#F7C8D0", "#C9E4A6"],
+    "True Spring":   ["#FF7F50", "#FFD700", "#40E0D0", "#FF6347", "#7CCD7C", "#FFAA80", "#CD853F", "#FFFFF0"],
+    "Bright Spring": ["#FF6F61", "#00B8A9", "#FFD166", "#EF476F", "#06D6A0", "#118AB2", "#FFC43D", "#E6399B"],
+
+    "Light Summer":  ["#B7D7EA", "#E8BFC5", "#B5D4C9", "#C5B8D9", "#CFE5F2", "#F0C5D0", "#C3D8E8", "#D8D2EE"],
+    "Cool Summer":   ["#7AA0C4", "#C4899A", "#7BA68C", "#9C84D9", "#6F93B0", "#BB6FA9", "#8FB1AA", "#A3B9D2"],
+    "Soft Summer":   ["#8AA3B5", "#C4868E", "#998CBD", "#6E9B9B", "#9FB3C8", "#B9A5B6", "#ADB7A3", "#9E5B5B"],
+
+    "Soft Autumn":   ["#9A8F7A", "#C4968C", "#758451", "#6B8E8E", "#B69B7D", "#B8A045", "#A18F7F", "#8A7F6B"],
+    "Warm Autumn":   ["#B5651D", "#BD6543", "#6B6B3A", "#D4A017", "#800000", "#367588", "#C68642", "#FAEBD7"],
+    "Deep Autumn":   ["#3E2723", "#4A5400", "#800020", "#8A3324", "#005F5F", "#B8860B", "#3C1414", "#0B3B24"],
+
+    "Bright Winter": ["#00A3E0", "#0057B8", "#008A3E", "#CC0033", "#7C3AED", "#F0F0F5", "#00B3E6", "#FF1493"],
+    "Cool Winter":   ["#000000", "#FFFFFF", "#CC0000", "#002FA7", "#FF1493", "#008A3E", "#FFB6C1", "#000080"],
+    "Deep Winter":   ["#1B365D", "#9B111E", "#006B3C", "#5F2566", "#000000", "#F0F0F5", "#002FA7", "#6C1D45"],
 }
 
 

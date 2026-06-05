@@ -1,0 +1,51 @@
+{
+  "manifest_version": 3,
+  "name": "Color Season Shopper",
+  "version": "0.1.0",
+  "description": "Match product colors to your seasonal color palette",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://*.amazon.com/*",
+    "https://*.amazon.co.uk/*",
+    "https://*.nordstrom.com/*",
+    "https://images-na.ssl-images-amazon.com/*",
+    "https://m.media-amazon.com/*",
+    "https://n.nordstrommedia.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.amazon.com/*",
+        "https://*.nordstrom.com/*"
+      ],
+      "js": ["color-analysis.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["palettes.json"],
+      "matches": ["https://*.amazon.com/*", "https://*.nordstrom.com/*"]
+    }
+  ]
+}

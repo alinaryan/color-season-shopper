@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="header">
+    <h1>Color Season Shopper</h1>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="analyze">Analyze</button>
+    <button class="tab" data-tab="season">My Season</button>
+  </div>
+
+  <!-- Analyze Tab -->
+  <div id="tab-analyze" class="tab-content active">
+    <div id="analyze-loading" class="loading hidden">
+      <div class="spinner"></div>
+      <p>Analyzing product image...</p>
+    </div>
+
+    <div id="analyze-empty" class="empty-state">
+      <p>Navigate to a product page on Amazon or Nordstrom, then click this icon to analyze the garment colors.</p>
+    </div>
+
+    <div id="pin-hint" class="pin-hint hidden">
+      <button id="pin-dismiss" class="pin-dismiss" aria-label="Dismiss">&times;</button>
+      Tip: Pin this extension to your toolbar for quick access. Click the puzzle icon, then the pin next to Color Season Shopper.
+    </div>
+
+    <div id="analyze-error" class="error-state hidden">
+      <p id="error-message">Could not find a product image on this page.</p>
+      <button id="retry-btn" class="btn-secondary">Try Again</button>
+    </div>
+
+    <div id="analyze-results" class="hidden">
+      <div class="product-preview">
+        <img id="product-thumb" alt="Product">
+      </div>
+
+      <div class="section">
+        <h3>Detected Colors</h3>
+        <div id="color-chips" class="color-chips"></div>
+      </div>
+
+      <div id="season-result" class="season-card">
+        <div class="best-match">
+          <span class="label">Best match</span>
+          <span id="best-season" class="season-name"></span>
+          <span id="best-score" class="score"></span>
+        </div>
+        <div id="user-match-indicator" class="match-indicator hidden"></div>
+      </div>
+
+      <div id="also-works" class="also-works hidden">
+        <h3>Also works for</h3>
+        <div id="also-list"></div>
+      </div>
+
+      <details class="details-section">
+        <summary>All seasons</summary>
+        <div id="all-seasons" class="all-seasons-list"></div>
+      </details>
+    </div>
+  </div>
+
+  <!-- My Season Tab -->
+  <div id="tab-season" class="tab-content">
+    <div id="season-saved" class="hidden">
+      <div class="saved-season-card">
+        <span class="label">Your season</span>
+        <span id="saved-season-name" class="season-name large"></span>
+        <div id="saved-palette" class="color-chips"></div>
+      </div>
+      <button id="retake-btn" class="btn-secondary">Retake Quiz</button>
+    </div>
+
+    <div id="season-quiz">
+      <p class="quiz-intro">Answer these questions about your natural coloring to find your season.</p>
+
+      <div class="quiz-question">
+        <label class="question-label">1. Hold gold and silver jewelry to your face. Which looks better?</label>
+        <div class="options" data-name="q1">
+          <label class="option"><input type="radio" name="q1" value="gold"> <span>Gold</span></label>
+          <label class="option"><input type="radio" name="q1" value="silver"> <span>Silver</span></label>
+          <label class="option"><input type="radio" name="q1" value="both"> <span>Both / can't tell</span></label>
+        </div>
+      </div>
+
+      <div class="quiz-question">
+        <label class="question-label">2. Your natural hair color (before dye/greying)?</label>
+        <div class="options" data-name="q2">
+          <label class="option"><input type="radio" name="q2" value="light-warm"> <span>Light blonde, strawberry, or golden brown</span></label>
+          <label class="option"><input type="radio" name="q2" value="light-cool"> <span>Ash blonde, mousy, or cool light brown</span></label>
+          <label class="option"><input type="radio" name="q2" value="dark-warm"> <span>Medium-dark with golden/red, auburn, or copper</span></label>
+          <label class="option"><input type="radio" name="q2" value="dark-cool"> <span>Dark ash brown, dark brown, or black</span></label>
+        </div>
+      </div>
+
+      <div class="quiz-question">
+        <label class="question-label">3. How does wearing solid black near your face look?</label>
+        <div class="options" data-name="q3">
+          <label class="option"><input type="radio" name="q3" value="great"> <span>Great — makes my features pop</span></label>
+          <label class="option"><input type="radio" name="q3" value="ok"> <span>Fine, but dark navy or charcoal is better</span></label>
+          <label class="option"><input type="radio" name="q3" value="harsh"> <span>Overpowers me — I look washed out</span></label>
+        </div>
+      </div>
+
+      <div class="quiz-question">
+        <label class="question-label">4. Which colors get you the most compliments?</label>
+        <div class="options" data-name="q4">
+          <label class="option"><input type="radio" name="q4" value="spring"> <span>Peach, coral, turquoise, golden yellow</span></label>
+          <label class="option"><input type="radio" name="q4" value="summer"> <span>Dusty rose, lavender, powder blue, sage</span></label>
+          <label class="option"><input type="radio" name="q4" value="autumn"> <span>Olive, rust, mustard, teal, warm brown</span></label>
+          <label class="option"><input type="radio" name="q4" value="winter"> <span>Fuchsia, royal blue, emerald, true red</span></label>
+        </div>
+      </div>
+
+      <div class="quiz-question">
+        <label class="question-label">5. Overall, your natural coloring is...</label>
+        <div class="options" data-name="q5">
+          <label class="option"><input type="radio" name="q5" value="light"> <span>Light — features are all relatively light</span></label>
+          <label class="option"><input type="radio" name="q5" value="medium"> <span>Medium — mix of light and medium tones</span></label>
+          <label class="option"><input type="radio" name="q5" value="deep"> <span>Deep — prominent dark features or high contrast</span></label>
+        </div>
+      </div>
+
+      <button id="quiz-submit" class="btn-primary" disabled>Find My Season</button>
+
+      <div id="quiz-result" class="hidden">
+        <div class="saved-season-card">
+          <span class="label">You are a</span>
+          <span id="quiz-result-name" class="season-name large"></span>
+          <div id="quiz-result-palette" class="color-chips"></div>
+        </div>
+        <button id="save-season-btn" class="btn-primary">Save as My Season</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="color-analysis.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
