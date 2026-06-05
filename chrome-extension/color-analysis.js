@@ -112,17 +112,17 @@ var ColorAnalysis = (function () {
   }
 
   function isNeutralGrey(r, g, b) {
-    // Reject true neutrals (grey/white/off-white backgrounds) but keep
-    // muted colors like sage green, dusty rose, slate blue.
-    // True neutrals: all channels within a very tight range of each other.
     var max = Math.max(r, g, b);
     var min = Math.min(r, g, b);
     var chroma = max - min;
 
-    // Pure greys: channels nearly identical
+    // Keep darks (black is a real garment color), only filter mid-to-light greys
+    if (max < 40) return false;
+
+    // Mid-range greys: channels nearly identical
     if (chroma < 8) return true;
 
-    // Near-white backgrounds (very light, very low saturation)
+    // Near-white backgrounds
     if (max > 225 && chroma < 15) return true;
 
     return false;
@@ -138,7 +138,6 @@ var ColorAnalysis = (function () {
       var r = pixels[i], g = pixels[i + 1], b = pixels[i + 2], a = pixels[i + 3];
       if (a < 128) continue;
       if (r > 240 && g > 240 && b > 240) continue;
-      if (r < 16 && g < 16 && b < 16) continue;
       if (isNeutralGrey(r, g, b)) continue;
       var qr = r >> 3, qg = g >> 3, qb = b >> 3;
       var key = (qr << 10) | (qg << 5) | qb;

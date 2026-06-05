@@ -191,29 +191,21 @@
   // -- Generic fallback --
 
   function genericProductImageDetection() {
-    var ogImage = document.querySelector('meta[property="og:image"]');
-    if (ogImage && ogImage.content) return ogImage.content;
-
-    var productPatterns = [/\/product\//i, /\/dp\//i, /\/p\//i, /\/item\//i, /\/prd\//i];
-    var excludeSelector = "nav, header, footer, [role='navigation'], [role='banner']";
+    var excludeSelector = "nav, header, footer, [role='navigation'], [role='banner'], " +
+      '[class*="recommend"], [class*="Recommend"], [class*="carousel"], ' +
+      '[class*="youMight"], [class*="YouMight"]';
     var excludeEls = document.querySelectorAll(excludeSelector);
     var excludeSet = new Set();
     excludeEls.forEach(function (el) { excludeSet.add(el); });
 
-    var links = document.querySelectorAll("a");
-    for (var i = 0; i < links.length; i++) {
-      var href = links[i].href || "";
-      var isProduct = productPatterns.some(function (p) { return p.test(href); });
-      if (!isProduct) continue;
-      var img = links[i].querySelector("img");
-      if (img && img.src && (img.naturalWidth || img.width) > 100) {
-        var inExcluded = false;
-        excludeSet.forEach(function (ex) { if (ex.contains(img)) inExcluded = true; });
-        if (!inExcluded) return img.src;
-      }
+    function isExcluded(el) {
+      var dominated = false;
+      excludeSet.forEach(function (ex) { if (ex.contains(el)) dominated = true; });
+      return dominated;
     }
 
-    // Last resort: largest visible image
+    // Strategy 1: Find the largest visible product image on the page.
+    // This works even after SPA color-swatch changes update the img src.
     var best = null, bestArea = 0;
     var allImgs = document.querySelectorAll("img");
     for (var j = 0; j < allImgs.length; j++) {
@@ -222,43 +214,82 @@
       var h = el.naturalHeight || el.height;
       if (w < 150 || h < 150) continue;
       if (!el.offsetParent) continue;
-      var inExcl = false;
-      excludeSet.forEach(function (ex) { if (ex.contains(el)) inExcl = true; });
-      if (inExcl) continue;
+      if (isExcluded(el)) continue;
       var area = w * h;
       if (area > bestArea) {
         bestArea = area;
         best = el.src;
       }
     }
-    return best;
+    if (best) return best;
+
+    // Strategy 2: og:image meta tag (may be stale on SPAs)
+    var ogImage = document.querySelector('meta[property="og:image"]');
+    if (ogImage && ogImage.content) return ogImage.content;
+
+    return null;
   }
 
   // ---- Product listing page detection ----
 
-  function detectSitePLP() {
+  function detectPageType() {
     var url = window.location.href;
     var hostname = window.location.hostname;
-    if (hostname.includes("amazon.") && (url.includes("/s?") || url.includes("/s/"))) return "amazon";
-    if (hostname.includes("nordstrom.com") && (url.includes("/sr?") || url.includes("/browse/"))) return "nordstrom";
+    if (hostname.includes("amazon.")) {
+      if (url.includes("/s?") || url.includes("/s/")) return "amazon-plp";
+      if (url.includes("/dp/") || url.includes("/gp/product/")) return "amazon-pdp";
+    }
+    if (hostname.includes("nordstrom.com")) {
+      if (url.includes("/sr?") || url.includes("/browse/")) return "nordstrom-plp";
+    }
     return null;
   }
 
   function detectProductListingImages() {
-    var site = detectSitePLP();
+    var pageType = detectPageType();
     var results = [];
 
-    if (site === "amazon") {
+    if (pageType === "amazon-plp") {
       var cards = document.querySelectorAll('div.s-result-item[data-component-type="s-search-result"]');
       cards.forEach(function (card) {
         var img = card.querySelector("img.s-image");
         if (img && img.src) {
-          results.push({ element: card, imageUrl: img.src, imgElement: img });
+          // Request a larger version for better color analysis
+          var hiRes = img.src.replace(/\._[A-Z0-9_,]+_\./, "._AC_SX400_.");
+          results.push({ element: card, imageUrl: hiRes, imgElement: img });
         }
       });
     }
 
-    if (site === "nordstrom") {
+    if (pageType === "amazon-pdp") {
+      // Tag color variant thumbnails on product detail pages.
+      // Amazon uses various container IDs/classes for color swatches.
+      var variantSelectors = [
+        '#variation_color_name li img',
+        '#tp-inline-twister-dim-values-container img',
+        '[id*="color_name"] li img',
+        '[id*="colour_name"] li img',
+        '.twisterSwatchWrapper img',
+        '[data-action="selected-color"] img',
+        '#twister-plus-inline-twister-card li img',
+      ];
+      var variantImages = document.querySelectorAll(variantSelectors.join(", "));
+      var seenSrcs = new Set();
+      variantImages.forEach(function (img) {
+        if (!img.src || seenSrcs.has(img.src)) return;
+        seenSrcs.add(img.src);
+        var w = img.naturalWidth || img.width;
+        var h = img.naturalHeight || img.height;
+        if (w < 20 || h < 20) return;
+        var container = img.closest("li") || img.parentElement;
+        if (container) {
+          var hiRes = img.src.replace(/\._[A-Z0-9_,]+_\./, "._AC_SX300_.");
+          results.push({ element: container, imageUrl: hiRes, imgElement: img });
+        }
+      });
+    }
+
+    if (pageType === "nordstrom-plp") {
       var selectors = [
         'article[data-testid*="product"]',
         'div[class*="product-card"]',
@@ -303,7 +334,19 @@
 
     var badge = document.createElement("div");
     badge.className = "css-season-badge";
-    badge.textContent = bestSeason;
+
+    // Use shorter labels for small containers (PDP variant thumbnails)
+    var parentW = parent.offsetWidth || 200;
+    if (parentW < 120) {
+      // Abbreviate: "Soft Summer" → "SS", "Bright Winter" → "BW"
+      var parts = bestSeason.split(" ");
+      badge.textContent = parts.map(function (w) { return w[0]; }).join("");
+      badge.title = bestSeason;
+      badge.style.fontSize = "9px";
+      badge.style.padding = "2px 5px";
+    } else {
+      badge.textContent = bestSeason;
+    }
 
     if (userSeason) {
       badge.classList.add(bestSeason === userSeason ? "css-badge-match" : "css-badge-nomatch");
@@ -393,8 +436,8 @@
   }
 
   function initPLPBadges() {
-    var site = detectSitePLP();
-    if (!site) return;
+    var pageType = detectPageType();
+    if (!pageType) return;
 
     loadPalettes(function (palettes) {
       if (!palettes) return;
@@ -411,21 +454,21 @@
               if (processed.has(card)) return;
               processed.add(card);
 
-              var img;
-              if (site === "amazon") {
-                img = card.querySelector("img.s-image");
-              } else {
-                img = card.querySelector('img[name="product-module-image"]') || card.querySelector("img");
-              }
-              if (!img || !img.src) return;
-              enqueueAnalysis(img, img.src, userSeason, palettes);
+              // Look up the pre-computed image URL and element for this card
+              var info = cardImageMap.get(card);
+              if (!info) return;
+              enqueueAnalysis(info.imgElement, info.imageUrl, userSeason, palettes);
             });
           },
           { rootMargin: "200px", threshold: 0.1 }
         );
 
+        // Build a map of card element → {imgElement, imageUrl} using the
+        // pre-computed hi-res URLs from detectProductListingImages
+        var cardImageMap = new Map();
         var items = detectProductListingImages();
         items.forEach(function (item) {
+          cardImageMap.set(item.element, item);
           observer.observe(item.element);
         });
 
@@ -434,6 +477,7 @@
           var newItems = detectProductListingImages();
           newItems.forEach(function (item) {
             if (!processed.has(item.element)) {
+              cardImageMap.set(item.element, item);
               observer.observe(item.element);
             }
           });

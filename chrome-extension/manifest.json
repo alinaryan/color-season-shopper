@@ -6,15 +6,11 @@
   "permissions": [
     "activeTab",
     "storage",
-    "scripting"
+    "scripting",
+    "declarativeNetRequest"
   ],
   "host_permissions": [
-    "https://*.amazon.com/*",
-    "https://*.amazon.co.uk/*",
-    "https://*.nordstrom.com/*",
-    "https://images-na.ssl-images-amazon.com/*",
-    "https://m.media-amazon.com/*",
-    "https://n.nordstrommedia.com/*"
+    "https://*/*"
   ],
   "background": {
     "service_worker": "background.js"
