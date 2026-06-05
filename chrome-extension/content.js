@@ -242,7 +242,8 @@
     if (hostname.includes("nordstrom.com")) {
       if (url.includes("/sr?") || url.includes("/browse/")) return "nordstrom-plp";
     }
-    return null;
+    // Generic: detect product grids on any e-commerce site
+    return "generic";
   }
 
   function detectProductListingImages() {
@@ -254,16 +255,14 @@
       cards.forEach(function (card) {
         var img = card.querySelector("img.s-image");
         if (img && img.src) {
-          // Request a larger version for better color analysis
           var hiRes = img.src.replace(/\._[A-Z0-9_,]+_\./, "._AC_SX400_.");
           results.push({ element: card, imageUrl: hiRes, imgElement: img });
         }
       });
+      return results;
     }
 
     if (pageType === "amazon-pdp") {
-      // Tag color variant thumbnails on product detail pages.
-      // Amazon uses various container IDs/classes for color swatches.
       var variantSelectors = [
         '#variation_color_name li img',
         '#tp-inline-twister-dim-values-container img',
@@ -287,6 +286,7 @@
           results.push({ element: container, imageUrl: hiRes, imgElement: img });
         }
       });
+      return results;
     }
 
     if (pageType === "nordstrom-plp") {
@@ -304,6 +304,54 @@
           results.push({ element: card, imageUrl: img.src, imgElement: img });
         }
       });
+      return results;
+    }
+
+    // Generic: find product grids on any e-commerce site.
+    // Look for repeated card-like containers with images and prices.
+    results = detectGenericProductGrid();
+    return results;
+  }
+
+  function detectGenericProductGrid() {
+    var results = [];
+    var excludeSelector = "nav, header, footer, [role='navigation'], [role='banner'], " +
+      '[class*="recommend"], [class*="carousel"], [class*="youMight"]';
+    var excludeEls = document.querySelectorAll(excludeSelector);
+    var excludeSet = new Set();
+    excludeEls.forEach(function (el) { excludeSet.add(el); });
+
+    // Find all links that point to product URLs
+    var productPatterns = [/\/product/i, /\/dp\//i, /\/p\//i, /\/item\//i, /\/prd\//i, /\/shop\//i, /\/products\//i];
+    var seen = new Set();
+
+    var links = document.querySelectorAll("a");
+    for (var i = 0; i < links.length; i++) {
+      var link = links[i];
+      var href = link.href || "";
+      if (!href || seen.has(href)) continue;
+
+      var isProduct = productPatterns.some(function (p) { return p.test(href); });
+      if (!isProduct) continue;
+
+      var img = link.querySelector("img");
+      if (!img || !img.src) continue;
+      var w = img.naturalWidth || img.width;
+      var h = img.naturalHeight || img.height;
+      if (w < 80 || h < 80) continue;
+
+      // Skip if inside excluded sections
+      var inExcl = false;
+      excludeSet.forEach(function (ex) { if (ex.contains(img)) inExcl = true; });
+      if (inExcl) continue;
+
+      // Use the link or its parent as the card container
+      var card = link.closest("article, li, [class*='product'], [class*='Product'], [class*='card'], [class*='Card']") || link;
+      if (seen.has(card)) continue;
+      seen.add(href);
+      seen.add(card);
+
+      results.push({ element: card, imageUrl: img.src, imgElement: img });
     }
 
     return results;
