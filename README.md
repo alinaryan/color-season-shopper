@@ -26,7 +26,7 @@ The extension is unpacked — no build step, no dependencies, no zip needed:
 
 Reload the extension from that same page after making changes.
 
-> **Note:** during development the manifest requests broad host access (`https://*/*`) so it can be tested on any store. See the **Chrome Web Store Submission** section below before publishing.
+> **Note:** the manifest requests broad host access (`https://*/*`) so the extension can be tested on any store during development.
 
 ---
 
@@ -72,20 +72,6 @@ Palettes live in `chrome-extension/palettes.json` and are loaded at runtime by b
 ⏩ ML-based garment segmentation
 
 ⏩ Chrome Web Store release
-
----
-
-## ⚠️ Chrome Web Store Submission
-
-Before publishing, narrow `host_permissions` and `content_scripts` matches in `chrome-extension/manifest.json` from `https://*/*` to the specific supported retailer domains. The broad permissions are intentional during development to allow testing across different sites, but the Web Store will require justification for broad host access.
-
-An icon set also has to be added back — a 128×128 icon is required for submission, and `manifest.json` currently declares none.
-
-Package from *inside* the extension directory, so `manifest.json` lands at the archive root — the Web Store rejects a zip with a wrapper folder:
-
-```bash
-cd chrome-extension && zip -r ../color-season-shopper.zip . -x "*.DS_Store" && cd ..
-```
 
 ---
 
