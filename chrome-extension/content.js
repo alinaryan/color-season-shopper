@@ -532,26 +532,6 @@
       .catch(function () { callback(null); });
   }
 
-  function analyzeAndBadge(imgElement, imageUrl, userSeason, palettes, productTitle) {
-    chrome.runtime.sendMessage({ type: "FETCH_IMAGE", url: imageUrl }, function (response) {
-      if (!response || !response.dataUrl) return;
-      var tempImg = new Image();
-      tempImg.onload = function () {
-        try {
-          var productType = productTitle ? ColorAnalysis.classifyProductType(productTitle) : "unknown";
-          var colors = ColorAnalysis.extractDominantColors(tempImg, 5, undefined, { productType: productType });
-          var ranking = ColorAnalysis.rankSeasons(colors, palettes);
-          if (ranking.length > 0) {
-            injectBadge(imgElement, ranking[0][0], userSeason);
-          }
-        } catch (e) {
-          // silently skip failed analyses
-        }
-      };
-      tempImg.src = response.dataUrl;
-    });
-  }
-
   var MAX_CONCURRENT = 4;
   var activeCount = 0;
   var queue = [];
