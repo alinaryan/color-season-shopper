@@ -478,6 +478,13 @@
     document.head.appendChild(style);
   }
 
+  function removeBadge(imgElement) {
+    var parent = imgElement && imgElement.parentElement;
+    if (!parent) return;
+    var existing = parent.querySelector(".css-season-badge");
+    if (existing) existing.remove();
+  }
+
   function injectBadge(imgElement, bestSeason, userSeason) {
     var parent = imgElement.parentElement;
     if (!parent || parent.querySelector(".css-season-badge")) return;
@@ -656,6 +663,26 @@
       chrome.storage.local.get(["userSeason"], function (data) {
         var userSeason = data.userSeason || null;
         var processed = new WeakSet();
+        var watchedImages = new WeakSet();
+
+        // Toggling a colour swatch on a card swaps the image src but keeps the
+        // same card element, so a card badged once would otherwise keep showing
+        // the previous variant's season. Watch the image and re-analyze when it
+        // actually changes.
+        function watchVariantChanges(info) {
+          var img = info.imgElement;
+          if (!img || watchedImages.has(img)) return;
+          watchedImages.add(img);
+
+          var srcObserver = new MutationObserver(function () {
+            var newSrc = img.src;
+            if (!newSrc || newSrc === info.imageUrl) return;
+            info.imageUrl = newSrc;
+            removeBadge(img);
+            enqueueAnalysis(img, newSrc, userSeason, palettes, info.productTitle, info.productUrl);
+          });
+          srcObserver.observe(img, { attributes: true, attributeFilter: ["src", "srcset"] });
+        }
 
         var observer = new IntersectionObserver(
           function (entries) {
@@ -675,6 +702,7 @@
               // guarantee, so an unknown type still bails there.
               var productType = ColorAnalysis.classifyProductType(titleForClassification);
               if (!info.confirmedProduct && productType === "unknown") return;
+              watchVariantChanges(info);
               enqueueAnalysis(info.imgElement, info.imageUrl, userSeason, palettes, info.productTitle, info.productUrl);
             });
           },
