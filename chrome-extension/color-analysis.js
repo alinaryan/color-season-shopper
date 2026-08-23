@@ -110,7 +110,11 @@ var ColorAnalysis = (function () {
 
   // ---- Product type classification ----
 
-  var FULL_RE = /\b(dress|dresses|jumpsuit|romper|gown|bodysuit|coverall|onesie)\b/i;
+  // "dress" needs a compound-aware pattern: \bdress\b misses shirtdress,
+  // sundress, and similar, which are common in real product names. The
+  // optional prefix is enumerated rather than \w* so that "address" and
+  // "headdress" do not match.
+  var FULL_RE = /\b(?:shirt|sun|sweater|slip|maxi|midi|mini|shift|wrap|tank|jumper|cami|sheath|cocktail)?dress(?:es)?\b|\b(?:jumpsuit|romper|playsuit|gown|bodysuit|coverall|onesie)\b/i;
   var TOP_RE = /\b(jacket|blazer|coat|vest|hoodie|sweater|cardigan|pullover|blouse|shirt|top|tee|tank|polo|cape|shrug|bolero|parka|anorak|windbreaker|fleece|sweatshirt|tunic|camisole|bralette|bustier|henley|crewneck)\b/i;
   var BOTTOM_RE = /\b(jeans?|pants?|trousers?|skirt|shorts|leggings|joggers?|chinos?|culottes?|palazzo|capri|bermuda|slacks)\b/i;
   var ACCESSORY_RE = /\b(shoes?|sneakers?|boots?|sandals?|loafers?|mules?|heels?|flats?|pumps?|oxfords?|espadrilles?|clogs?|slippers?|handbag|purse|tote|clutch|crossbody|satchel|backpack|wallet|wristlet|scarf|scarves|shawl|wrap|stole|hat|beanie|beret|fedora|cap|visor|headband|bandana|sunglasses|glasses|eyewear|jewelry|necklace|bracelet|earrings?|ring|anklet|brooch|pendant|choker|watch|watches|belt|belts|tie|ties|bow\s?tie|necktie|gloves?|mittens?|socks?|stockings?|tights?|swimsuit|bikini|tankini|swim\s?trunks)\b/i;

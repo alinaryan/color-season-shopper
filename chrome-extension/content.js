@@ -4,7 +4,7 @@
   if (window.__colorSeasonShopperLoaded) return;
   window.__colorSeasonShopperLoaded = true;
 
-  var CACHE_VERSION = 9;
+  var CACHE_VERSION = 10;
 
   // ---- Product image detection ----
 
@@ -296,7 +296,7 @@
           }
           var productLink = card.querySelector("h2 a, a[href*='/dp/']");
           var productUrl = productLink ? productLink.href : "";
-          results.push({ element: card, imageUrl: hiRes, imgElement: img, productTitle: productTitle, productUrl: productUrl });
+          results.push({ element: card, imageUrl: hiRes, imgElement: img, productTitle: productTitle, productUrl: productUrl, confirmedProduct: true });
         }
       });
       addAmazonCarouselProducts(results);
@@ -326,7 +326,7 @@
         var container = img.closest("li") || img.parentElement;
         if (container) {
           var hiRes = img.src.replace(/\._[A-Z0-9_,]+_\./, "._AC_SX300_.");
-          results.push({ element: container, imageUrl: hiRes, imgElement: img, productTitle: mainTitle });
+          results.push({ element: container, imageUrl: hiRes, imgElement: img, productTitle: mainTitle, confirmedProduct: true });
         }
       });
       addAmazonCarouselProducts(results);
@@ -334,23 +334,36 @@
     }
 
     if (pageType === "nordstrom-plp") {
-      var selectors = [
-        'article[data-testid*="product"]',
-        'div[class*="product-card"]',
-        'div[class*="ProductCard"]',
-      ];
-      var cards2 = document.querySelectorAll(selectors.join(", "));
-      cards2.forEach(function (card) {
-        var img =
-          card.querySelector('img[name="product-module-image"]') ||
-          card.querySelector("img");
-        if (img && img.src && img.src.includes("nordstrom")) {
-          var titleEl = card.querySelector('h3, h2, a[class*="title"], a[class*="Title"], [class*="product-title"]');
-          var productTitle = titleEl ? titleEl.textContent.trim() : "";
-          var productLink = card.querySelector("a[href]");
-          var productUrl = productLink ? productLink.href : "";
-          results.push({ element: card, imageUrl: img.src, imgElement: img, productTitle: productTitle, productUrl: productUrl });
-        }
+      // Nordstrom ships CSS-module hashed class names ("IZSr3 oDseh pKJIK")
+      // with no data-testid, and the hashes change on every deploy, so cards
+      // cannot be matched by class. Anchor on the PDP link shape instead —
+      // /s/{slug}/{id} — and walk up to the containing card element.
+      var seenCards = new Set();
+      var links2 = document.querySelectorAll('a[href*="/s/"]');
+      links2.forEach(function (link) {
+        if (!/\/s\/[^/]+\/\d+/.test(link.pathname || "")) return;
+        var img = link.querySelector("img") ||
+          (link.closest("article") && link.closest("article").querySelector("img"));
+        if (!img || !img.src || !img.src.includes("nordstrom")) return;
+
+        var card = link.closest("article") || link.parentElement;
+        if (!card || seenCards.has(card)) return;
+        seenCards.add(card);
+
+        // Class-based title selectors fail for the same reason, so read the
+        // title from content rather than markup structure.
+        var productTitle = (img.alt || "").trim();
+        if (productTitle.length < 3) productTitle = (link.getAttribute("aria-label") || "").trim();
+        if (productTitle.length < 3) productTitle = (link.textContent || "").trim();
+
+        results.push({
+          element: card,
+          imageUrl: img.src,
+          imgElement: img,
+          productTitle: productTitle,
+          productUrl: link.href,
+          confirmedProduct: true,
+        });
       });
       return results;
     }
@@ -652,8 +665,12 @@
               var info = cardImageMap.get(card);
               if (!info) return;
               var titleForClassification = info.productTitle || (info.imgElement && info.imgElement.alt) || "";
+              // A card from a site-specific detector is known to be a product, so
+              // a title that will not classify only means "sample the whole
+              // image" rather than "skip". The generic grid detector has no such
+              // guarantee, so an unknown type still bails there.
               var productType = ColorAnalysis.classifyProductType(titleForClassification);
-              if (productType === "unknown") return;
+              if (!info.confirmedProduct && productType === "unknown") return;
               enqueueAnalysis(info.imgElement, info.imageUrl, userSeason, palettes, info.productTitle, info.productUrl);
             });
           },
