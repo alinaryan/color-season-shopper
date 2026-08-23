@@ -3,7 +3,7 @@
 
   var palettes = null;
   var userSeason = null;
-  var CACHE_VERSION = 8;
+  var CACHE_VERSION = 9;
 
   // ---- Init ----
 

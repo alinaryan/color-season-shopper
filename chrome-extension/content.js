@@ -4,7 +4,7 @@
   if (window.__colorSeasonShopperLoaded) return;
   window.__colorSeasonShopperLoaded = true;
 
-  var CACHE_VERSION = 8;
+  var CACHE_VERSION = 9;
 
   // ---- Product image detection ----
 
@@ -681,23 +681,47 @@
 
   // ---- Message handling ----
 
+  // Amazon puts a screen-reader-only heading above the real product title, so
+  // a visible element is preferred when one is available.
+  function isVisibleTitle(el) {
+    if (!el.offsetParent) return false;
+    if (el.getAttribute("aria-hidden") === "true") return false;
+    var rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }
+
+  // Ordered most specific first. A generic "h1" must come last: querySelector
+  // returns the first match in document order, not the most relevant one, so
+  // leading with it picks up whatever heading a page happens to render first.
+  var TITLE_SELECTORS = [
+    "#productTitle",
+    '[class*="product-title"]',
+    '[class*="ProductTitle"]',
+    '[class*="product-name"]',
+    '[class*="ProductName"]',
+    "#title span",
+    "h1",
+  ];
+
   function detectProductTitle() {
-    var selectors = [
-      "h1",
-      "#productTitle",
-      "#title span",
-      '[class*="product-title"]',
-      '[class*="ProductTitle"]',
-      '[class*="product-name"]',
-      '[class*="ProductName"]',
-    ];
-    for (var i = 0; i < selectors.length; i++) {
-      var el = document.querySelector(selectors[i]);
-      if (el && el.textContent.trim().length > 2) return el.textContent.trim();
+    var i, j, els, text;
+    var fallback = "";
+
+    for (i = 0; i < TITLE_SELECTORS.length; i++) {
+      els = document.querySelectorAll(TITLE_SELECTORS[i]);
+      for (j = 0; j < els.length; j++) {
+        text = els[j].textContent.trim();
+        if (text.length <= 2) continue;
+        if (isVisibleTitle(els[j])) return text;
+        if (!fallback) fallback = text;
+      }
     }
+
     var og = document.querySelector('meta[property="og:title"]');
     if (og && og.content) return og.content.trim();
-    return "";
+
+    // Nothing visible matched — better a hidden title than none at all.
+    return fallback;
   }
 
   chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
