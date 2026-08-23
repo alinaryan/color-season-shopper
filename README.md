@@ -43,22 +43,6 @@ See [COLOR-SCIENCE.md](COLOR-SCIENCE.md) for the full pipeline — conversion ch
 
 ---
 
-## 🗂️ Project Layout
-
-```
-chrome-extension/
-  manifest.json       Manifest V3 config
-  color-analysis.js   Color science: Lab conversion, ΔE76, extraction, ranking
-  content.js          Product image detection and badge injection
-  popup.html/js/css   Popup UI: season quiz and manual analysis
-  background.js       Service worker: image fetching and CORS header rewriting
-  palettes.json       The 12 season palettes (8 swatches each)
-```
-
-Palettes live in `chrome-extension/palettes.json` and are loaded at runtime by both the content script and the popup. Edit that file directly.
-
----
-
 ## 🛣️ Roadmap
 
 ✅ Color extraction + palette ranking
