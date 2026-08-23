@@ -1,69 +1,97 @@
-# 🎨 Color Season Shopper (MVP)
+# 🎨 Color Season Shopper
 
-**Color Season Shopper** is a lightweight demo app that helps you see which seasonal color palette a clothing item fits best.  
-Upload a product photo, crop to the garment, and the app will analyze the dominant colors and suggest the **best color season** (e.g., Soft Summer) and **other seasons it could work for**.
+**Color Season Shopper** is a Chrome extension that tells you which seasonal color palette a garment fits — so you can tell at a glance whether that sweater is actually your color.
 
-Built with **Python + Streamlit**, using color science in Lab space (ΔE76).
-
----
-
-## ✨ Features
-- Upload any product image (JPEG/PNG/WebP)
-- Interactive crop/zoom so you can isolate the garment
-- Extracts dominant colors automatically
-- Ranks palettes across **9 classic color seasons**
-- Clear decision language:
-  - ✅ **Best for:** the closest season
-  - ➕ **Also works for:** other likely matches
-- Batch mode (process a CSV of product images)
+It runs while you browse, reads product images off the page, and badges the ones that match your season. Matching uses color science in CIE Lab space (ΔE76) against **12 color seasons** (Sci/ART system).
 
 ---
 
-## 🚀 Quickstart
+## ✨ What It Does
 
-### Clone & Install
-**Python:** 3.11 recommended (custom Streamlit component compatibility). 
-```bash
-git clone https://github.com/alinaryan/color-season-shopper.git
-cd color-season-shopper
-python3.11 -m venv venv
-source venv/bin/activate   # or venv\Scripts\activate on Windows
-pip install -r requirements.txt
-```
+- **Take the quiz once** in the popup to set your season — it's stored locally and used to highlight your matches.
+- **Badges on listing and detail pages**, so you can scan a grid of products without opening each one.
+- **Per-site image detection** for Amazon and Nordstrom, plus a generic fallback that works on most e-commerce sites.
+- **Knows when to stay quiet** — it rejects background colors, filters skin tones, detects patterns, and abstains entirely when it isn't confident, rather than guessing.
+- **Manual analysis** in the popup for any image on the current page.
 
-### Run the Streamlit Demo
-```bash
-streamlit run streamlit_app.py
-```
-Then open http://localhost:8501 in your browser.
+---
 
-<p align="center"> <img src="screenshots/demo_upload.png" width="600" alt="Upload and crop demo"> </p> <p align="center"> <img src="screenshots/demo_result.png" width="600" alt="Best for Cool Summer result"> </p>
+## 🚀 Install (development)
+
+The extension is unpacked — no build step, no dependencies, no zip needed:
+
+1. Open `chrome://extensions`
+2. Turn on **Developer mode** (top right)
+3. Click **Load unpacked** and select the `chrome-extension/` directory
+
+Reload the extension from that same page after making changes.
+
+> **Note:** during development the manifest requests broad host access (`https://*/*`) so it can be tested on any store. See the **Chrome Web Store Submission** section below before publishing.
 
 ---
 
 ## 📊 How It Works (the math)
 
-- Extract dominant colors → convert to CIE Lab color space.
-
+- Extract dominant colors from the product image → convert to CIE Lab color space.
 - Compare garment colors against each palette using ΔE76 (Euclidean distance in Lab).
-
 - Lower ΔE = closer visual match.
+- Return the closest palette as "Best for" and the next two as "Also works for."
 
-- Return the closest palette as “Best for” and the next two as “Also works for.”
+Before scoring, the extension isolates the garment: it detects and rejects background colors, filters out skin tones, weights the garment region based on the product type parsed from the title, and suppresses the badge entirely when the best match isn't clearly better than its neighbors.
+
+See [COLOR-SCIENCE.md](COLOR-SCIENCE.md) for the full pipeline — conversion chain, thresholds, and known limitations.
+
 ---
+
+## 🗂️ Project Layout
+
+```
+chrome-extension/
+  manifest.json       Manifest V3 config
+  color-analysis.js   Color science: Lab conversion, ΔE76, extraction, ranking
+  content.js          Product image detection and badge injection
+  popup.html/js/css   Popup UI: season quiz and manual analysis
+  background.js       Service worker: image fetching and CORS header rewriting
+  palettes.json       The 12 season palettes (8 swatches each)
+```
+
+Palettes live in `chrome-extension/palettes.json` and are loaded at runtime by both the content script and the popup. Edit that file directly.
+
+---
+
 ## 🛣️ Roadmap
 
-✅ MVP: color extraction + palette ranking
+✅ Color extraction + palette ranking
 
-⏩ Chrome extension overlay
+✅ 12-season palettes (Sci/ART)
+
+✅ Background rejection + confidence thresholds
 
 ⏩ Smarter color difference (ΔE2000)
 
-⏩ Automatic garment segmentation (replace manual crop)
+⏩ ML-based garment segmentation
+
+⏩ Chrome Web Store release
+
+---
+
+## ⚠️ Chrome Web Store Submission
+
+Before publishing, narrow `host_permissions` and `content_scripts` matches in `chrome-extension/manifest.json` from `https://*/*` to the specific supported retailer domains. The broad permissions are intentional during development to allow testing across different sites, but the Web Store will require justification for broad host access.
+
+An icon set also has to be added back — a 128×128 icon is required for submission, and `manifest.json` currently declares none.
+
+Package from *inside* the extension directory, so `manifest.json` lands at the archive root — the Web Store rejects a zip with a wrapper folder:
+
+```bash
+cd chrome-extension && zip -r ../color-season-shopper.zip . -x "*.DS_Store" && cd ..
+```
+
+---
 
 ## 📜 License
 
-Copyright © 2025 Alina Ryan. All rights reserved.
+Copyright © 2026 Alina Ryan. All rights reserved.
 
 This project is provided for demonstration and evaluation purposes only.  
 No part of this repository, including code, documentation, or other content,  
