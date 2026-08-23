@@ -89,19 +89,24 @@
     // Nordstrom PDP URLs follow /s/{product-slug}/{product-id}
     var isPDP = /\/s\/[^/]+\/\d+/.test(window.location.pathname);
 
-    if (isPDP) {
-      // Strategy 1: Look for the main product hero image.
-      // Nordstrom PDP hero images are large images from their CDN
-      // that are NOT inside recommendation/editorial sections.
-      var heroImg = findNordstromHeroImage();
-      if (heroImg) return heroImg;
-    }
+    // Off a PDP there is no single product to analyze. The fallbacks below all
+    // resolve to *something* — og:image on a category page is the editorial
+    // banner, and the largest CDN image is usually that same banner — so they
+    // would return a confident reading of a marketing photo. Better to report
+    // nothing and let the popup tell the user to open a product page; the
+    // listing grid is handled by the injected badges instead.
+    if (!isPDP) return "";
 
-    // Strategy 2: Named product-module-image (used on some pages)
+    // Strategy 1: the main product hero image, which on a PDP is a large CDN
+    // image outside any recommendation or editorial section.
+    var heroImg = findNordstromHeroImage();
+    if (heroImg) return heroImg;
+
+    // Strategy 2: named product-module-image (used on some pages)
     var named = document.querySelector('img[name="product-module-image"]');
     if (named && named.src) return named.src;
 
-    // Strategy 3: og:image meta tag (reliable on PDPs)
+    // Strategy 3: og:image, which is the product shot on a PDP
     var ogImage = document.querySelector('meta[property="og:image"]');
     if (ogImage && ogImage.content) return ogImage.content;
 
