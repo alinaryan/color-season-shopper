@@ -145,7 +145,6 @@
 
         var confidence = ColorAnalysis.classifyConfidence(colors, ranking);
         renderResults(img.src, colors, ranking, confidence);
-        showDebugPanel(productTitle, productType, colors, ranking, imageUrl, img, confidence);
 
         if (tabUrl) {
           var cacheKey = normalizeUrl(tabUrl);
@@ -324,56 +323,6 @@
         '<span class="de-score">ΔE ' + entry[1].toFixed(1) + "</span>";
       allContainer.appendChild(row);
     });
-  }
-
-  function showDebugPanel(productTitle, productType, colors, ranking, imageUrl, imgEl, confidence) {
-    var panel = document.getElementById("debug-panel");
-    var content = document.getElementById("debug-content");
-    if (!panel || !content) return;
-
-    var bgColors = colors._bgColors || [];
-    var whiteBg = imgEl ? ColorAnalysis.isWhiteBackground(imgEl, 200) : "n/a";
-
-    var lines = [];
-    if (imageUrl) {
-      var shortUrl = imageUrl.length > 80 ? imageUrl.substring(0, 80) + "..." : imageUrl;
-      lines.push("image: " + shortUrl);
-    }
-    lines.push("title: " + (productTitle || "(none)").substring(0, 80));
-    lines.push("type: " + productType);
-    lines.push("whiteBg: " + whiteBg + (whiteBg ? " (border detection skipped)" : " (border detection ran)"));
-
-    if (bgColors.length > 0) {
-      var bgSwatches = bgColors.map(function (hex) {
-        return '<span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:' + hex + ';vertical-align:middle;margin:0 2px;border:1px solid #444;"></span>' + hex;
-      }).join("  ");
-      lines.push("border bg: " + bgSwatches);
-    } else {
-      lines.push("border bg: (none — white bg or no colored border detected)");
-    }
-
-    lines.push("threshold: ΔE " + (ColorAnalysis.BG_REJECT_DE_THRESHOLD || "n/a"));
-    lines.push("sampling tier: " + (colors._tier || "?"));
-
-    var garmentSwatches = colors.map(function (c) {
-      var hex = typeof c === "string" ? c : c.hex;
-      var w = typeof c === "string" ? "" : " (" + (c.weight * 100).toFixed(0) + "%)";
-      return '<span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:' + hex + ';vertical-align:middle;margin:0 2px;border:1px solid #444;"></span>' + hex + w;
-    }).join("  ");
-    lines.push("garment: " + garmentSwatches);
-
-    if (confidence) {
-      var confStr = confidence.state;
-      if (confidence.state === "siblings") confStr += " (" + confidence.seasons.join(", ") + ")";
-      if (confidence.state === "pattern") confStr += " (maxPairΔE: " + (confidence.maxPairDE || 0).toFixed(1) + ")";
-      if (confidence.state === "no-match") confStr += " (bestΔE: " + (confidence.bestDE || 0).toFixed(1) + ")";
-      confStr += " | display: " + (confidence.display.match ? "match" : "no-match");
-      if (confidence.display.suppress) confStr += " [suppressed]";
-      lines.push("confidence: " + confStr);
-    }
-
-    content.innerHTML = lines.join("<br>");
-    panel.classList.remove("hidden");
   }
 
   // ---- Quiz ----
