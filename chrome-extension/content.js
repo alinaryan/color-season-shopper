@@ -565,7 +565,10 @@
       chrome.storage.local.get(["plpSeasonCache"], function (data) {
         var cache = data.plpSeasonCache || {};
         var cached = cache[cacheKey];
-        if (cached && cached.v === CACHE_VERSION && Date.now() - cached.ts < 86400000 && cached.ranking && cached.ranking.length > 0) {
+        // cached.imageUrl must match: a product URL is shared by every colour
+        // variant, so the key alone would serve one variant's analysis for another.
+        if (cached && cached.v === CACHE_VERSION && cached.imageUrl === imageUrl &&
+            Date.now() - cached.ts < 86400000 && cached.ranking && cached.ranking.length > 0) {
           var cachedConf = ColorAnalysis.classifyConfidence(cached.colors || [], cached.ranking);
           if (!cachedConf.display.suppress && cachedConf.display.label) {
             injectBadge(imgElement, cachedConf.display.label, userSeason);
@@ -617,6 +620,7 @@
                 if (Object.keys(cache).length > 200) cache = {};
                 cache[cacheKey] = {
                   v: CACHE_VERSION,
+                  imageUrl: imageUrl,
                   ranking: ranking,
                   colors: colors.map(function (c) { return { hex: c.hex, weight: c.weight }; }),
                   ts: Date.now(),
@@ -755,7 +759,8 @@
       chrome.storage.local.get(["plpSeasonCache"], function (data) {
         var cache = data.plpSeasonCache || {};
         var cached = cache[cacheKey] || null;
-        if (cached && (cached.v !== CACHE_VERSION || Date.now() - cached.ts > 86400000)) cached = null;
+        if (cached && (cached.v !== CACHE_VERSION || cached.imageUrl !== imageUrl ||
+            Date.now() - cached.ts > 86400000)) cached = null;
         sendResponse({
           imageUrl: imageUrl,
           allImageUrls: allImageUrls,

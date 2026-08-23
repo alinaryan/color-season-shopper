@@ -153,6 +153,7 @@
             if (Object.keys(cache).length > 200) cache = {};
             cache[cacheKey] = {
               v: CACHE_VERSION,
+              imageUrl: imageUrl,
               ranking: ranking,
               colors: colors.map(function (c) { return { hex: c.hex, weight: c.weight }; }),
               ts: Date.now(),
