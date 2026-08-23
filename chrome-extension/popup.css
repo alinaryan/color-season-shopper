@@ -177,6 +177,17 @@ body {
   margin-bottom: 12px;
 }
 
+.season-card.abstain {
+  background: #f3f4f6;
+  border: 1px dashed #d1d5db;
+}
+
+.season-card.abstain .season-name {
+  color: #6b7280;
+  font-size: 15px;
+  font-weight: 600;
+}
+
 .best-match {
   display: flex;
   align-items: baseline;
@@ -425,4 +436,74 @@ body {
 
 .saved-season-card .color-chips {
   justify-content: center;
+}
+
+/* Quiz / Picker toggle */
+.quiz-toggle {
+  display: flex;
+  gap: 0;
+  margin-bottom: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.toggle-btn {
+  flex: 1;
+  padding: 8px 0;
+  border: none;
+  background: #f3f4f6;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.toggle-btn.active {
+  background: #111;
+  color: #fff;
+}
+
+/* Season picker */
+.season-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.season-pick-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.season-pick-option:hover {
+  border-color: #9ca3af;
+}
+
+.season-pick-option.selected {
+  border-color: #111;
+  background: #f9fafb;
+}
+
+.season-pick-option .pick-swatches {
+  display: flex;
+  gap: 3px;
+  margin-left: auto;
+}
+
+.season-pick-option .pick-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid rgba(0,0,0,0.06);
 }

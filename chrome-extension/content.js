@@ -4,6 +4,8 @@
   if (window.__colorSeasonShopperLoaded) return;
   window.__colorSeasonShopperLoaded = true;
 
+  var CACHE_VERSION = 8;
+
   // ---- Product image detection ----
 
   function detectProductImage() {
@@ -190,10 +192,22 @@
 
   // -- Generic fallback --
 
+  var BANNER_DOMAINS = ["afterpay", "klarna", "clearpay", "sezzle", "affirm", "paypal",
+    "facebook", "instagram", "twitter", "tiktok", "pinterest", "youtube", "google-analytics",
+    "doubleclick", "adsrv", "cdn.shopify.com/s/files/1/0000"];
+
+  function isBannerImage(src) {
+    if (!src) return false;
+    var lower = src.toLowerCase();
+    return BANNER_DOMAINS.some(function (d) { return lower.includes(d); });
+  }
+
   function genericProductImageDetection() {
     var excludeSelector = "nav, header, footer, [role='navigation'], [role='banner'], " +
       '[class*="recommend"], [class*="Recommend"], [class*="carousel"], ' +
-      '[class*="youMight"], [class*="YouMight"]';
+      '[class*="youMight"], [class*="YouMight"], iframe, [class*="afterpay"], ' +
+      '[class*="Afterpay"], [class*="klarna"], [class*="Klarna"], [class*="payment"], ' +
+      '[class*="Payment"], [class*="banner"], [class*="Banner"], [class*="promo"], [class*="Promo"]';
     var excludeEls = document.querySelectorAll(excludeSelector);
     var excludeSet = new Set();
     excludeEls.forEach(function (el) { excludeSet.add(el); });
@@ -205,7 +219,7 @@
     }
 
     // Strategy 1: Find the largest visible product image on the page.
-    // This works even after SPA color-swatch changes update the img src.
+    // Prefer portrait-oriented images (product photos) over landscape (banners).
     var best = null, bestArea = 0;
     var allImgs = document.querySelectorAll("img");
     for (var j = 0; j < allImgs.length; j++) {
@@ -215,6 +229,9 @@
       if (w < 150 || h < 150) continue;
       if (!el.offsetParent) continue;
       if (isExcluded(el)) continue;
+      if (isBannerImage(el.src)) continue;
+      var ratio = h / w;
+      if (ratio < 0.7) continue;
       var area = w * h;
       if (area > bestArea) {
         bestArea = area;
@@ -228,6 +245,17 @@
     if (ogImage && ogImage.content) return ogImage.content;
 
     return null;
+  }
+
+  // ---- URL normalization for caching ----
+
+  function normalizeProductUrl(url) {
+    try {
+      var u = new URL(url, window.location.origin);
+      return u.origin + u.pathname;
+    } catch (e) {
+      return url;
+    }
   }
 
   // ---- Product listing page detection ----
@@ -256,13 +284,23 @@
         var img = card.querySelector("img.s-image");
         if (img && img.src) {
           var hiRes = img.src.replace(/\._[A-Z0-9_,]+_\./, "._AC_SX400_.");
-          results.push({ element: card, imageUrl: hiRes, imgElement: img });
+          var productTitle = img.alt || "";
+          if (!productTitle) {
+            var titleEl = card.querySelector("h2");
+            productTitle = titleEl ? titleEl.textContent.trim() : "";
+          }
+          var productLink = card.querySelector("h2 a, a[href*='/dp/']");
+          var productUrl = productLink ? productLink.href : "";
+          results.push({ element: card, imageUrl: hiRes, imgElement: img, productTitle: productTitle, productUrl: productUrl });
         }
       });
+      addAmazonCarouselProducts(results);
       return results;
     }
 
     if (pageType === "amazon-pdp") {
+      var mainTitleEl = document.querySelector("#productTitle, #title span");
+      var mainTitle = mainTitleEl ? mainTitleEl.textContent.trim() : "";
       var variantSelectors = [
         '#variation_color_name li img',
         '#tp-inline-twister-dim-values-container img',
@@ -283,9 +321,10 @@
         var container = img.closest("li") || img.parentElement;
         if (container) {
           var hiRes = img.src.replace(/\._[A-Z0-9_,]+_\./, "._AC_SX300_.");
-          results.push({ element: container, imageUrl: hiRes, imgElement: img });
+          results.push({ element: container, imageUrl: hiRes, imgElement: img, productTitle: mainTitle });
         }
       });
+      addAmazonCarouselProducts(results);
       return results;
     }
 
@@ -301,7 +340,11 @@
           card.querySelector('img[name="product-module-image"]') ||
           card.querySelector("img");
         if (img && img.src && img.src.includes("nordstrom")) {
-          results.push({ element: card, imageUrl: img.src, imgElement: img });
+          var titleEl = card.querySelector('h3, h2, a[class*="title"], a[class*="Title"], [class*="product-title"]');
+          var productTitle = titleEl ? titleEl.textContent.trim() : "";
+          var productLink = card.querySelector("a[href]");
+          var productUrl = productLink ? productLink.href : "";
+          results.push({ element: card, imageUrl: img.src, imgElement: img, productTitle: productTitle, productUrl: productUrl });
         }
       });
       return results;
@@ -310,13 +353,19 @@
     // Generic: find product grids on any e-commerce site.
     // Look for repeated card-like containers with images and prices.
     results = detectGenericProductGrid();
+    if (window.location.hostname.includes("amazon.")) {
+      addAmazonCarouselProducts(results);
+    }
     return results;
   }
 
   function detectGenericProductGrid() {
     var results = [];
-    var excludeSelector = "nav, header, footer, [role='navigation'], [role='banner'], " +
-      '[class*="recommend"], [class*="carousel"], [class*="youMight"]';
+    var isAmazon = window.location.hostname.includes("amazon.");
+    var excludeSelector = "nav, header, footer, [role='navigation'], [role='banner']";
+    if (!isAmazon) {
+      excludeSelector += ', [class*="recommend"], [class*="carousel"], [class*="youMight"]';
+    }
     var excludeEls = document.querySelectorAll(excludeSelector);
     var excludeSet = new Set();
     excludeEls.forEach(function (el) { excludeSet.add(el); });
@@ -351,10 +400,48 @@
       seen.add(href);
       seen.add(card);
 
-      results.push({ element: card, imageUrl: img.src, imgElement: img });
+      var titleEl = card.querySelector('h1, h2, h3, h4, [class*="title"], [class*="name"], [class*="Title"], [class*="Name"]');
+      var productTitle = titleEl ? titleEl.textContent.trim() : "";
+      if (!productTitle) {
+        var linkText = link.textContent.trim();
+        if (linkText.length > 3 && linkText.length < 200) productTitle = linkText;
+      }
+      results.push({ element: card, imageUrl: img.src, imgElement: img, productTitle: productTitle, productUrl: href });
     }
 
     return results;
+  }
+
+  function addAmazonCarouselProducts(results) {
+    var seenElements = new Set();
+    results.forEach(function (r) { seenElements.add(r.element); });
+
+    var carouselImgs = document.querySelectorAll(
+      '.a-carousel-card a[href*="/dp/"] img, ' +
+      '[class*="a-carousel"] a[href*="/dp/"] img'
+    );
+    carouselImgs.forEach(function (img) {
+      if (!img || !img.src) return;
+      var w = img.naturalWidth || img.width;
+      var h = img.naturalHeight || img.height;
+      if (w < 60 || h < 60) return;
+
+      var link = img.closest('a[href*="/dp/"]');
+      if (!link) return;
+      var card = img.closest(".a-carousel-card") || link;
+      if (seenElements.has(card)) return;
+      seenElements.add(card);
+
+      var hiRes = img.src.replace(/\._[A-Z0-9_,]+_\./, "._AC_SX400_.");
+      var title = img.alt || "";
+      results.push({
+        element: card,
+        imageUrl: hiRes,
+        imgElement: img,
+        productTitle: title,
+        productUrl: link.href,
+      });
+    });
   }
 
   // ---- Badge injection (for PLP inline tagging) ----
@@ -420,13 +507,14 @@
       .catch(function () { callback(null); });
   }
 
-  function analyzeAndBadge(imgElement, imageUrl, userSeason, palettes) {
+  function analyzeAndBadge(imgElement, imageUrl, userSeason, palettes, productTitle) {
     chrome.runtime.sendMessage({ type: "FETCH_IMAGE", url: imageUrl }, function (response) {
       if (!response || !response.dataUrl) return;
       var tempImg = new Image();
       tempImg.onload = function () {
         try {
-          var colors = ColorAnalysis.extractDominantColors(tempImg, 5);
+          var productType = productTitle ? ColorAnalysis.classifyProductType(productTitle) : "unknown";
+          var colors = ColorAnalysis.extractDominantColors(tempImg, 5, undefined, { productType: productType });
           var ranking = ColorAnalysis.rankSeasons(colors, palettes);
           if (ranking.length > 0) {
             injectBadge(imgElement, ranking[0][0], userSeason);
@@ -443,16 +531,38 @@
   var activeCount = 0;
   var queue = [];
 
-  function enqueueAnalysis(imgElement, imageUrl, userSeason, palettes) {
+  function enqueueAnalysis(imgElement, imageUrl, userSeason, palettes, productTitle, productUrl) {
     if (activeCount < MAX_CONCURRENT) {
       activeCount++;
-      analyzeAndBadgeThrottled(imgElement, imageUrl, userSeason, palettes);
+      analyzeAndBadgeThrottled(imgElement, imageUrl, userSeason, palettes, productTitle, productUrl);
     } else {
-      queue.push({ imgElement: imgElement, imageUrl: imageUrl, userSeason: userSeason, palettes: palettes });
+      queue.push({ imgElement: imgElement, imageUrl: imageUrl, userSeason: userSeason, palettes: palettes, productTitle: productTitle || "", productUrl: productUrl || "" });
     }
   }
 
-  function analyzeAndBadgeThrottled(imgElement, imageUrl, userSeason, palettes) {
+  function analyzeAndBadgeThrottled(imgElement, imageUrl, userSeason, palettes, productTitle, productUrl) {
+    var cacheKey = productUrl ? normalizeProductUrl(productUrl) : null;
+
+    if (cacheKey) {
+      chrome.storage.local.get(["plpSeasonCache"], function (data) {
+        var cache = data.plpSeasonCache || {};
+        var cached = cache[cacheKey];
+        if (cached && cached.v === CACHE_VERSION && Date.now() - cached.ts < 86400000 && cached.ranking && cached.ranking.length > 0) {
+          var cachedConf = ColorAnalysis.classifyConfidence(cached.colors || [], cached.ranking);
+          if (!cachedConf.display.suppress && cachedConf.display.label) {
+            injectBadge(imgElement, cachedConf.display.label, userSeason);
+          }
+          onAnalysisDone();
+          return;
+        }
+        performAnalysis(imgElement, imageUrl, userSeason, palettes, productTitle, cacheKey);
+      });
+    } else {
+      performAnalysis(imgElement, imageUrl, userSeason, palettes, productTitle, null);
+    }
+  }
+
+  function performAnalysis(imgElement, imageUrl, userSeason, palettes, productTitle, cacheKey) {
     chrome.runtime.sendMessage({ type: "FETCH_IMAGE", url: imageUrl }, function (response) {
       if (!response || !response.dataUrl) {
         onAnalysisDone();
@@ -461,10 +571,41 @@
       var tempImg = new Image();
       tempImg.onload = function () {
         try {
-          var colors = ColorAnalysis.extractDominantColors(tempImg, 5);
+          var productType = productTitle ? ColorAnalysis.classifyProductType(productTitle) : "unknown";
+          var colors = ColorAnalysis.extractDominantColors(tempImg, 5, undefined, { productType: productType });
           var ranking = ColorAnalysis.rankSeasons(colors, palettes);
           if (ranking.length > 0) {
-            injectBadge(imgElement, ranking[0][0], userSeason);
+            var confidence = ColorAnalysis.classifyConfidence(colors, ranking);
+            if (ColorAnalysis.BG_DEBUG) {
+              console.log("[CSS bg-result]",
+                ranking[0][0], "| confidence:", confidence.state,
+                "| bg:", (colors._bgColors || []).join(", "),
+                "| garment:", colors.map(function (c) { return c.hex; }).join(", "),
+                "| title:", (productTitle || "").substring(0, 60));
+            }
+            if (confidence.display.suppress) {
+              onAnalysisDone();
+              return;
+            }
+            if (!confidence.display.label) {
+              onAnalysisDone();
+              return;
+            }
+            var badgeLabel = confidence.display.label;
+            injectBadge(imgElement, badgeLabel, userSeason);
+            if (cacheKey) {
+              chrome.storage.local.get(["plpSeasonCache"], function (data) {
+                var cache = data.plpSeasonCache || {};
+                if (Object.keys(cache).length > 200) cache = {};
+                cache[cacheKey] = {
+                  v: CACHE_VERSION,
+                  ranking: ranking,
+                  colors: colors.map(function (c) { return { hex: c.hex, weight: c.weight }; }),
+                  ts: Date.now(),
+                };
+                chrome.storage.local.set({ plpSeasonCache: cache });
+              });
+            }
           }
         } catch (e) {}
         onAnalysisDone();
@@ -479,7 +620,7 @@
     if (queue.length > 0) {
       var next = queue.shift();
       activeCount++;
-      analyzeAndBadgeThrottled(next.imgElement, next.imageUrl, next.userSeason, next.palettes);
+      analyzeAndBadgeThrottled(next.imgElement, next.imageUrl, next.userSeason, next.palettes, next.productTitle, next.productUrl);
     }
   }
 
@@ -505,7 +646,10 @@
               // Look up the pre-computed image URL and element for this card
               var info = cardImageMap.get(card);
               if (!info) return;
-              enqueueAnalysis(info.imgElement, info.imageUrl, userSeason, palettes);
+              var titleForClassification = info.productTitle || (info.imgElement && info.imgElement.alt) || "";
+              var productType = ColorAnalysis.classifyProductType(titleForClassification);
+              if (productType === "unknown") return;
+              enqueueAnalysis(info.imgElement, info.imageUrl, userSeason, palettes, info.productTitle, info.productUrl);
             });
           },
           { rootMargin: "200px", threshold: 0.1 }
@@ -537,12 +681,43 @@
 
   // ---- Message handling ----
 
+  function detectProductTitle() {
+    var selectors = [
+      "h1",
+      "#productTitle",
+      "#title span",
+      '[class*="product-title"]',
+      '[class*="ProductTitle"]',
+      '[class*="product-name"]',
+      '[class*="ProductName"]',
+    ];
+    for (var i = 0; i < selectors.length; i++) {
+      var el = document.querySelector(selectors[i]);
+      if (el && el.textContent.trim().length > 2) return el.textContent.trim();
+    }
+    var og = document.querySelector('meta[property="og:title"]');
+    if (og && og.content) return og.content.trim();
+    return "";
+  }
+
   chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
     if (msg.type === "GET_PRODUCT_IMAGE") {
-      sendResponse({
-        imageUrl: detectProductImage(),
-        allImageUrls: detectAllProductImages(),
+      var imageUrl = detectProductImage();
+      var allImageUrls = detectAllProductImages();
+      var productTitle = detectProductTitle();
+      var cacheKey = normalizeProductUrl(window.location.href);
+      chrome.storage.local.get(["plpSeasonCache"], function (data) {
+        var cache = data.plpSeasonCache || {};
+        var cached = cache[cacheKey] || null;
+        if (cached && (cached.v !== CACHE_VERSION || Date.now() - cached.ts > 86400000)) cached = null;
+        sendResponse({
+          imageUrl: imageUrl,
+          allImageUrls: allImageUrls,
+          productTitle: productTitle,
+          cachedResult: cached,
+        });
       });
+      return true;
     }
     if (msg.type === "GET_PRODUCT_IMAGES_PLP") {
       var images = detectProductListingImages().map(function (item) {

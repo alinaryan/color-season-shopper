@@ -3,6 +3,7 @@
 
   var palettes = null;
   var userSeason = null;
+  var CACHE_VERSION = 8;
 
   // ---- Init ----
 
@@ -59,6 +60,15 @@
     });
   }
 
+  function normalizeUrl(url) {
+    try {
+      var u = new URL(url);
+      return u.origin + u.pathname;
+    } catch (e) {
+      return url;
+    }
+  }
+
   // ---- Analysis ----
 
   function setupRetry() {
@@ -87,14 +97,26 @@
               showError("No product image found on this page. Try a product detail page.");
               return;
             }
-            fetchAndAnalyze(response.imageUrl);
+            if (response.cachedResult && response.cachedResult.v === CACHE_VERSION && !ColorAnalysis.BG_DEBUG) {
+              fetchImageAndRenderCached(response.imageUrl, response.cachedResult);
+              return;
+            }
+            fetchAndAnalyze(response.imageUrl, response.productTitle, tab.url);
           });
         }
       );
     });
   }
 
-  function fetchAndAnalyze(imageUrl) {
+  function fetchImageAndRenderCached(imageUrl, cached) {
+    chrome.runtime.sendMessage({ type: "FETCH_IMAGE", url: imageUrl }, function (response) {
+      var imgSrc = (response && response.dataUrl) ? response.dataUrl : "";
+      var confidence = ColorAnalysis.classifyConfidence(cached.colors, cached.ranking);
+      renderResults(imgSrc, cached.colors, cached.ranking, confidence);
+    });
+  }
+
+  function fetchAndAnalyze(imageUrl, productTitle, tabUrl) {
     chrome.runtime.sendMessage({ type: "FETCH_IMAGE", url: imageUrl }, function (response) {
       if (chrome.runtime.lastError || !response || !response.dataUrl) {
         showError("Could not load the product image.");
@@ -108,7 +130,8 @@
           return;
         }
 
-        var colors = ColorAnalysis.extractDominantColors(img, 5);
+        var productType = productTitle ? ColorAnalysis.classifyProductType(productTitle) : "unknown";
+        var colors = ColorAnalysis.extractDominantColors(img, 5, undefined, { productType: productType });
         if (!colors || colors.length === 0) {
           showError("Could not extract colors from this image. Try a different product.");
           return;
@@ -120,7 +143,24 @@
           return;
         }
 
-        renderResults(img.src, colors, ranking);
+        var confidence = ColorAnalysis.classifyConfidence(colors, ranking);
+        renderResults(img.src, colors, ranking, confidence);
+        showDebugPanel(productTitle, productType, colors, ranking, imageUrl, img, confidence);
+
+        if (tabUrl) {
+          var cacheKey = normalizeUrl(tabUrl);
+          chrome.storage.local.get(["plpSeasonCache"], function (data) {
+            var cache = data.plpSeasonCache || {};
+            if (Object.keys(cache).length > 200) cache = {};
+            cache[cacheKey] = {
+              v: CACHE_VERSION,
+              ranking: ranking,
+              colors: colors.map(function (c) { return { hex: c.hex, weight: c.weight }; }),
+              ts: Date.now(),
+            };
+            chrome.storage.local.set({ plpSeasonCache: cache });
+          });
+        }
       };
       img.onerror = function () {
         showError("Failed to decode the product image.");
@@ -146,7 +186,7 @@
     showState("error");
   }
 
-  function renderResults(imageSrc, colors, ranking) {
+  function renderResults(imageSrc, colors, ranking, confidence) {
     showState("results");
 
     document.getElementById("product-thumb").src = imageSrc;
@@ -163,43 +203,117 @@
       chipsContainer.appendChild(chip);
     });
 
-    var best = ranking[0];
-    document.getElementById("best-season").textContent = best[0];
-    document.getElementById("best-score").textContent = "ΔE " + best[1].toFixed(1);
-
-    // User match indicator
+    var seasonCard = document.getElementById("season-result");
+    var bestLabel = document.querySelector(".best-match .label");
+    var bestSeason = document.getElementById("best-season");
+    var bestScore = document.getElementById("best-score");
     var indicator = document.getElementById("user-match-indicator");
-    if (userSeason) {
-      indicator.classList.remove("hidden", "is-match", "not-match");
-      if (best[0] === userSeason) {
-        indicator.classList.add("is-match");
-        indicator.textContent = "This is in your season!";
-      } else {
-        indicator.classList.add("not-match");
-        indicator.textContent = "Your season is " + userSeason;
-      }
-    } else {
-      indicator.classList.add("hidden");
-    }
-
-    // Also works for
     var alsoContainer = document.getElementById("also-works");
     var alsoList = document.getElementById("also-list");
-    if (ranking.length > 1) {
-      alsoContainer.classList.remove("hidden");
-      alsoList.innerHTML = "";
-      var runners = ranking.slice(1, 3);
-      runners.forEach(function (entry) {
-        var span = document.createElement("span");
-        span.className = "also-item";
-        span.textContent = entry[0] + " (ΔE " + entry[1].toFixed(1) + ")";
-        alsoList.appendChild(span);
-      });
-    } else {
+    var disp = confidence.display;
+
+    if (!disp.match) {
+      // States (c) and (d) — not a match
+      bestLabel.textContent = "";
+      bestSeason.textContent = disp.sublabel || disp.label;
+      bestScore.textContent = confidence.state === "no-match" ? "ΔE " + confidence.bestDE.toFixed(1) : "";
+      seasonCard.classList.add("abstain");
       alsoContainer.classList.add("hidden");
+
+      if (confidence.state === "pattern" && userSeason && palettes && palettes[userSeason]) {
+        var patternResult = ColorAnalysis.checkPatternForSeason(colors, palettes[userSeason]);
+        if (patternResult.matchCount >= ColorAnalysis.PATTERN_MATCH_COUNT) {
+          indicator.classList.remove("hidden", "is-match", "not-match");
+          indicator.classList.add("is-match");
+          indicator.textContent = "Has colors that work for you";
+        } else {
+          indicator.classList.remove("hidden", "is-match", "not-match");
+          indicator.classList.add("not-match");
+          indicator.textContent = "Leans away from your colors";
+        }
+        // Highlight which detected color chips matched the user's palette
+        var chips = chipsContainer.querySelectorAll(".color-chip");
+        for (var ci = 0; ci < chips.length; ci++) {
+          var chipHex = chips[ci].getAttribute("data-hex");
+          if (patternResult.matchedHexes.indexOf(chipHex) >= 0) {
+            chips[ci].style.outline = "2px solid #16a34a";
+            chips[ci].style.outlineOffset = "2px";
+          }
+        }
+      } else {
+        indicator.classList.add("hidden");
+      }
+
+    } else if (confidence.state === "siblings") {
+      // State (b) — match, multiple siblings
+      bestLabel.textContent = "Works for";
+      bestSeason.textContent = disp.label;
+      bestScore.textContent = "ΔE " + confidence.bestDE.toFixed(1);
+      seasonCard.classList.remove("abstain");
+
+      if (userSeason) {
+        indicator.classList.remove("hidden", "is-match", "not-match");
+        if (confidence.seasons.indexOf(userSeason) >= 0) {
+          indicator.classList.add("is-match");
+          indicator.textContent = "This is in your season!";
+        } else {
+          indicator.classList.add("not-match");
+          indicator.textContent = "Your season is " + userSeason;
+        }
+      } else {
+        indicator.classList.add("hidden");
+      }
+
+      // Show non-best siblings in also-works
+      if (confidence.seasons.length > 1) {
+        alsoContainer.classList.remove("hidden");
+        alsoList.innerHTML = "";
+        for (var si = 1; si < confidence.seasons.length; si++) {
+          var span = document.createElement("span");
+          span.className = "also-item";
+          span.textContent = confidence.seasons[si] + " (ΔE " + confidence.scores[si].toFixed(1) + ")";
+          alsoList.appendChild(span);
+        }
+      } else {
+        alsoContainer.classList.add("hidden");
+      }
+
+    } else {
+      // State (a) — confident single match
+      bestLabel.textContent = "Best match";
+      bestSeason.textContent = disp.label;
+      bestScore.textContent = "ΔE " + confidence.bestDE.toFixed(1);
+      seasonCard.classList.remove("abstain");
+
+      if (userSeason) {
+        indicator.classList.remove("hidden", "is-match", "not-match");
+        if (confidence.bestSeason === userSeason) {
+          indicator.classList.add("is-match");
+          indicator.textContent = "This is in your season!";
+        } else {
+          indicator.classList.add("not-match");
+          indicator.textContent = "Your season is " + userSeason;
+        }
+      } else {
+        indicator.classList.add("hidden");
+      }
+
+      if (ranking.length > 1) {
+        alsoContainer.classList.remove("hidden");
+        alsoList.innerHTML = "";
+        var runners = ranking.slice(1, 3);
+        runners.forEach(function (entry) {
+          var span = document.createElement("span");
+          span.className = "also-item";
+          span.textContent = entry[0] + " (ΔE " + entry[1].toFixed(1) + ")";
+          alsoList.appendChild(span);
+        });
+      } else {
+        alsoContainer.classList.add("hidden");
+      }
     }
 
-    // All seasons
+    // All seasons (always shown)
     var allContainer = document.getElementById("all-seasons");
     allContainer.innerHTML = "";
     ranking.forEach(function (entry) {
@@ -212,12 +326,138 @@
     });
   }
 
+  function showDebugPanel(productTitle, productType, colors, ranking, imageUrl, imgEl, confidence) {
+    var panel = document.getElementById("debug-panel");
+    var content = document.getElementById("debug-content");
+    if (!panel || !content) return;
+
+    var bgColors = colors._bgColors || [];
+    var whiteBg = imgEl ? ColorAnalysis.isWhiteBackground(imgEl, 200) : "n/a";
+
+    var lines = [];
+    if (imageUrl) {
+      var shortUrl = imageUrl.length > 80 ? imageUrl.substring(0, 80) + "..." : imageUrl;
+      lines.push("image: " + shortUrl);
+    }
+    lines.push("title: " + (productTitle || "(none)").substring(0, 80));
+    lines.push("type: " + productType);
+    lines.push("whiteBg: " + whiteBg + (whiteBg ? " (border detection skipped)" : " (border detection ran)"));
+
+    if (bgColors.length > 0) {
+      var bgSwatches = bgColors.map(function (hex) {
+        return '<span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:' + hex + ';vertical-align:middle;margin:0 2px;border:1px solid #444;"></span>' + hex;
+      }).join("  ");
+      lines.push("border bg: " + bgSwatches);
+    } else {
+      lines.push("border bg: (none — white bg or no colored border detected)");
+    }
+
+    lines.push("threshold: ΔE " + (ColorAnalysis.BG_REJECT_DE_THRESHOLD || "n/a"));
+    lines.push("sampling tier: " + (colors._tier || "?"));
+
+    var garmentSwatches = colors.map(function (c) {
+      var hex = typeof c === "string" ? c : c.hex;
+      var w = typeof c === "string" ? "" : " (" + (c.weight * 100).toFixed(0) + "%)";
+      return '<span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:' + hex + ';vertical-align:middle;margin:0 2px;border:1px solid #444;"></span>' + hex + w;
+    }).join("  ");
+    lines.push("garment: " + garmentSwatches);
+
+    if (confidence) {
+      var confStr = confidence.state;
+      if (confidence.state === "siblings") confStr += " (" + confidence.seasons.join(", ") + ")";
+      if (confidence.state === "pattern") confStr += " (maxPairΔE: " + (confidence.maxPairDE || 0).toFixed(1) + ")";
+      if (confidence.state === "no-match") confStr += " (bestΔE: " + (confidence.bestDE || 0).toFixed(1) + ")";
+      confStr += " | display: " + (confidence.display.match ? "match" : "no-match");
+      if (confidence.display.suppress) confStr += " [suppressed]";
+      lines.push("confidence: " + confStr);
+    }
+
+    content.innerHTML = lines.join("<br>");
+    panel.classList.remove("hidden");
+  }
+
   // ---- Quiz ----
+
+  var ALL_SEASONS = [
+    "Light Spring", "True Spring", "Bright Spring",
+    "Light Summer", "Cool Summer", "Soft Summer",
+    "Soft Autumn", "Warm Autumn", "Deep Autumn",
+    "Bright Winter", "Cool Winter", "Deep Winter",
+  ];
 
   function setupQuiz() {
     var radios = document.querySelectorAll('#season-quiz input[type="radio"]');
     var submitBtn = document.getElementById("quiz-submit");
 
+    // -- Toggle between quiz and picker --
+    var toggleQuizBtn = document.getElementById("toggle-quiz");
+    var togglePickBtn = document.getElementById("toggle-pick");
+    var quizQuestions = document.getElementById("quiz-questions");
+    var pickerDiv = document.getElementById("season-picker");
+
+    toggleQuizBtn.addEventListener("click", function () {
+      toggleQuizBtn.classList.add("active");
+      togglePickBtn.classList.remove("active");
+      quizQuestions.classList.remove("hidden");
+      pickerDiv.classList.add("hidden");
+    });
+
+    togglePickBtn.addEventListener("click", function () {
+      togglePickBtn.classList.add("active");
+      toggleQuizBtn.classList.remove("active");
+      pickerDiv.classList.remove("hidden");
+      quizQuestions.classList.add("hidden");
+    });
+
+    // -- Build season picker list --
+    var pickerList = document.getElementById("season-picker-list");
+    var pickerSaveBtn = document.getElementById("picker-save-btn");
+    var pickedSeason = null;
+
+    function waitForPalettes(cb) {
+      if (palettes) return cb();
+      setTimeout(function () { waitForPalettes(cb); }, 100);
+    }
+
+    waitForPalettes(function () {
+      ALL_SEASONS.forEach(function (season) {
+        var option = document.createElement("div");
+        option.className = "season-pick-option";
+
+        var label = document.createElement("span");
+        label.textContent = season;
+        option.appendChild(label);
+
+        var swatches = document.createElement("span");
+        swatches.className = "pick-swatches";
+        var colors = (palettes[season] || []).slice(0, 5);
+        colors.forEach(function (hex) {
+          var swatch = document.createElement("span");
+          swatch.className = "pick-swatch";
+          swatch.style.backgroundColor = hex;
+          swatches.appendChild(swatch);
+        });
+        option.appendChild(swatches);
+
+        option.addEventListener("click", function () {
+          pickerList.querySelectorAll(".season-pick-option").forEach(function (o) {
+            o.classList.remove("selected");
+          });
+          option.classList.add("selected");
+          pickedSeason = season;
+          pickerSaveBtn.disabled = false;
+        });
+
+        pickerList.appendChild(option);
+      });
+    });
+
+    pickerSaveBtn.addEventListener("click", function () {
+      if (!pickedSeason) return;
+      saveSeason(pickedSeason);
+    });
+
+    // -- Quiz radios --
     radios.forEach(function (radio) {
       radio.addEventListener("change", function () {
         var answered = new Set();
@@ -241,32 +481,44 @@
 
     document.getElementById("save-season-btn").addEventListener("click", function () {
       var name = document.getElementById("quiz-result-name").textContent;
-      chrome.storage.local.set({ userSeason: name }, function () {
-        userSeason = name;
-        updateSeasonTab();
-        // Re-render analysis results if visible
-        var indicator = document.getElementById("user-match-indicator");
-        var bestEl = document.getElementById("best-season");
-        if (bestEl.textContent) {
-          indicator.classList.remove("hidden", "is-match", "not-match");
-          if (bestEl.textContent === userSeason) {
-            indicator.classList.add("is-match");
-            indicator.textContent = "This is in your season!";
-          } else {
-            indicator.classList.add("not-match");
-            indicator.textContent = "Your season is " + userSeason;
-          }
-        }
-      });
+      saveSeason(name);
     });
 
     document.getElementById("retake-btn").addEventListener("click", function () {
       document.getElementById("season-saved").classList.add("hidden");
       document.getElementById("season-quiz").classList.remove("hidden");
       document.getElementById("quiz-result").classList.add("hidden");
-      // Reset radios
+      // Reset to quiz view
+      toggleQuizBtn.classList.add("active");
+      togglePickBtn.classList.remove("active");
+      quizQuestions.classList.remove("hidden");
+      pickerDiv.classList.add("hidden");
       radios.forEach(function (r) { r.checked = false; });
       submitBtn.disabled = true;
+      pickerList.querySelectorAll(".season-pick-option").forEach(function (o) {
+        o.classList.remove("selected");
+      });
+      pickerSaveBtn.disabled = true;
+      pickedSeason = null;
+    });
+  }
+
+  function saveSeason(name) {
+    chrome.storage.local.set({ userSeason: name }, function () {
+      userSeason = name;
+      updateSeasonTab();
+      var indicator = document.getElementById("user-match-indicator");
+      var bestEl = document.getElementById("best-season");
+      if (bestEl.textContent) {
+        indicator.classList.remove("hidden", "is-match", "not-match");
+        if (bestEl.textContent === userSeason) {
+          indicator.classList.add("is-match");
+          indicator.textContent = "This is in your season!";
+        } else {
+          indicator.classList.add("not-match");
+          indicator.textContent = "Your season is " + userSeason;
+        }
+      }
     });
   }
 
@@ -277,6 +529,8 @@
 
     var paletteContainer = document.getElementById("quiz-result-palette");
     renderPaletteChips(paletteContainer, season);
+
+    resultDiv.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   function updateSeasonTab() {

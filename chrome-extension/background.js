@@ -1,3 +1,6 @@
+// TODO: Before Chrome Web Store submission, narrow host_permissions and
+// content_scripts matches in manifest.json to specific supported retailer domains.
+
 // Fix CORS issues: some CDNs (e.g. Abercrombie) send invalid
 // Access-Control-Allow-Origin headers. Strip and replace them
 // so the service worker fetch succeeds.

@@ -63,6 +63,11 @@
         <summary>All seasons</summary>
         <div id="all-seasons" class="all-seasons-list"></div>
       </details>
+
+      <div id="debug-panel" class="hidden" style="margin-top:12px; padding:8px; background:#1a1a2e; border-radius:6px; font-family:monospace; font-size:10px; color:#a0a0a0; line-height:1.6;">
+        <div style="color:#666; margin-bottom:4px;">DEBUG</div>
+        <div id="debug-content"></div>
+      </div>
     </div>
   </div>
 
@@ -78,6 +83,18 @@
     </div>
 
     <div id="season-quiz">
+      <div class="quiz-toggle">
+        <button id="toggle-quiz" class="toggle-btn active">Take the Quiz</button>
+        <button id="toggle-pick" class="toggle-btn">I Know My Season</button>
+      </div>
+
+      <div id="season-picker" class="hidden">
+        <p class="quiz-intro">Select your color season below.</p>
+        <div id="season-picker-list" class="season-picker-list"></div>
+        <button id="picker-save-btn" class="btn-primary" disabled>Save as My Season</button>
+      </div>
+
+      <div id="quiz-questions">
       <p class="quiz-intro">Answer these questions about your natural coloring to find your season.</p>
 
       <div class="quiz-question">
@@ -136,6 +153,7 @@
           <div id="quiz-result-palette" class="color-chips"></div>
         </div>
         <button id="save-season-btn" class="btn-primary">Save as My Season</button>
+      </div>
       </div>
     </div>
   </div>
